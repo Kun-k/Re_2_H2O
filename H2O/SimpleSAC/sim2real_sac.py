@@ -1,6 +1,3 @@
-# from turtle import pd
-import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional as F
 from ml_collections import ConfigDict
@@ -134,7 +131,7 @@ class Sim2realSAC(object):
         real_actions = real_batch['actions']
         real_rewards = real_batch['rewards']
         real_next_observations = real_batch['next_observations']
-        real_dones = real_batch['dones'] 
+        real_dones = real_batch['dones']
 
         # sim transitions from d^\pi_\mathcal{\widehat{M}}
         sim_observations = sim_batch['observations']
@@ -148,7 +145,6 @@ class Sim2realSAC(object):
         df_actions = torch.cat([real_actions, sim_actions], dim=0)
         df_rewards = torch.cat([real_rewards, sim_rewards], dim=0)
 
-        dsa_loss, dsas_loss = self.train_discriminator()
 
         df_new_actions, df_log_pi = self.policy(df_observations)
 
@@ -186,51 +182,20 @@ class Sim2realSAC(object):
             real_q1_pred = self.qf1(real_observations, real_actions)
             real_q2_pred = self.qf2(real_observations, real_actions)
             real_q_lip = 0
-        if self.is_sim_q_lip:
-            sim_q1_pred, sim_q1_grad = self.qf1(sim_observations, sim_actions, True)
-            sim_q2_pred, sim_q2_grad = self.qf2(sim_observations, sim_actions, True)
-            sim_q1_grad = torch.mean(sim_q1_grad)
-            sim_q2_grad = torch.mean(sim_q2_grad)
-            sim_q1_lip = self.tau_lip* ((max(0, sim_q1_grad - self.threshold_lip)) ** 2)
-            sim_q2_lip = self.tau_lip * ((max(0, sim_q2_grad - self.threshold_lip)) ** 2)
-            sim_q_lip = sim_q1_lip + sim_q2_lip
-        else:
-            sim_q1_pred = self.qf1(sim_observations, sim_actions)
-            sim_q2_pred = self.qf2(sim_observations, sim_actions)
-            sim_q_lip = 0
 
-        if self.is_target_lip:
-            real_new_next_actions, real_next_log_pi = self.policy(real_next_observations)
-            sim_new_next_actions, sim_next_log_pi = self.policy(sim_next_observations)
-            real_target_q1_pred, real_target_q1_grad = self.target_qf1(real_next_observations,
-                                                                       real_new_next_actions, True)
-            real_target_q2_pred, real_target_q2_grad = self.target_qf2(real_next_observations,
-                                                                       real_new_next_actions, True)
-            sim_target_q1_pred, sim_target_q1_grad = self.target_qf1(sim_next_observations, sim_new_next_actions, True)
-            sim_target_q2_pred, sim_target_q2_grad = self.target_qf2(sim_next_observations, sim_new_next_actions, True)
-            real_target_q_values = torch.min(real_target_q1_pred, real_target_q2_pred)
-            sim_target_q_values = torch.min(sim_target_q1_pred, sim_target_q2_pred)
-            real_target_q1_grad = torch.mean(real_target_q1_grad)
-            real_target_q2_grad = torch.mean(real_target_q2_grad)
-            sim_target_q1_grad = torch.mean(sim_target_q1_grad)
-            sim_target_q2_grad = torch.mean(sim_target_q2_grad)
-            q1_target_lip = self.tau_lip * ((max(0, real_target_q1_grad - self.threshold_lip)) ** 2 +
-                                            (max(0, sim_target_q1_grad - self.threshold_lip)) ** 2)
-            q2_target_lip = self.tau_lip * ((max(0, real_target_q2_grad - self.threshold_lip)) ** 2 +
-                                            (max(0, sim_target_q2_grad - self.threshold_lip)) ** 2)
-            q_target_lip = q1_target_lip + q2_target_lip
-        else:
-            real_new_next_actions, real_next_log_pi = self.policy(real_next_observations)
-            real_target_q_values = torch.min(
-                self.target_qf1(real_next_observations, real_new_next_actions),
-                self.target_qf2(real_next_observations, real_new_next_actions),
-            )
-            sim_new_next_actions, sim_next_log_pi = self.policy(sim_next_observations)
-            sim_target_q_values = torch.min(
-                self.target_qf1(sim_next_observations, sim_new_next_actions),
-                self.target_qf2(sim_next_observations, sim_new_next_actions),
-            )
-            q_target_lip = 0
+        sim_q1_pred = self.qf1(sim_observations, sim_actions)
+        sim_q2_pred = self.qf2(sim_observations, sim_actions)
+
+        real_new_next_actions, real_next_log_pi = self.policy(real_next_observations)
+        real_target_q_values = torch.min(
+            self.target_qf1(real_next_observations, real_new_next_actions),
+            self.target_qf2(real_next_observations, real_new_next_actions),
+        )
+        sim_new_next_actions, sim_next_log_pi = self.policy(sim_next_observations)
+        sim_target_q_values = torch.min(
+            self.target_qf1(sim_next_observations, sim_new_next_actions),
+            self.target_qf2(sim_next_observations, sim_new_next_actions),
+        )
 
         if self.config.backup_entropy:
             real_target_q_values = real_target_q_values - alpha * real_next_log_pi
@@ -241,16 +206,13 @@ class Sim2realSAC(object):
         real_qf1_loss = F.mse_loss(real_q1_pred, real_td_target.detach())
         real_qf2_loss = F.mse_loss(real_q2_pred, real_td_target.detach())
 
-        # importance sampling on td error due to the dyanmics shift
-        if self.config.use_td_target_ratio:
-            sqrt_IS_ratio = torch.clamp(self.real_sim_dynacmis_ratio(sim_observations, sim_actions, sim_next_observations), self.config.clip_dynamics_ratio_min, self.config.clip_dynamics_ratio_max).sqrt()
-        else:
-            sqrt_IS_ratio = torch.ones((sim_observations.shape[0],)).to(self.config.device)
         sim_qf1_loss = F.mse_loss(sim_q1_pred, sim_td_target.detach())
         sim_qf2_loss = F.mse_loss(sim_q2_pred, sim_td_target.detach())
         qf1_loss = real_qf1_loss + sim_qf1_loss
         qf2_loss = real_qf2_loss + sim_qf2_loss
 
+        #
+        ### Conservative Penalty loss: sim data
         if not self.config.use_cql:
             qf_loss = qf1_loss + qf2_loss
 
@@ -273,8 +235,6 @@ class Sim2realSAC(object):
                 )
 
             metrics = dict(
-                dsa_train_loss=dsa_loss,
-                dsas_train_loss=dsas_loss,
                 log_pi=df_log_pi.mean().item(),
                 policy_loss=policy_loss.item(),
                 real_qf1_loss=real_qf1_loss.item(),
@@ -298,22 +258,9 @@ class Sim2realSAC(object):
             # shape [128]
             cql_q1 = self.qf1(sim_observations, sim_actions)
             cql_q2 = self.qf2(sim_observations, sim_actions)
-            if self.config.use_sim_q_coeff:
-                u_sa = self.kl_sim_divergence(sim_observations, sim_actions, sim_next_observations)
-            else:
-                u_sa = torch.ones(sim_rewards.shape[0], device=self.config.device)
 
-            omega = u_sa / u_sa
+            omega = torch.ones(sim_rewards.shape[0], device=self.config.device)
             std_omega = omega.std()
-
-            if self.config.u_ablation and self._total_steps % 1000 == 0:
-                x_velocity = sim_observations[:,8].cpu().detach().numpy().reshape((-1,1))
-                u_log = u_sa.cpu().detach().numpy().reshape((-1,1))
-                omega_log = omega.cpu().detach().numpy().reshape((-1,1))
-                Q_log = sim_q1_pred.cpu().detach().numpy().reshape((-1,1))
-                loggings = np.concatenate((x_velocity, u_log, omega_log, Q_log), axis=1)
-                df = pd.DataFrame(loggings,columns=["velocity", "u_sa", "omega_sa", "Q value"])
-                df.to_csv("ablation_log/step_{}-v3.csv".format(int(self._total_steps/1000)))
 
             # Q values on the actions sampled from the policy
             if self.config.use_variant:
@@ -325,31 +272,7 @@ class Sim2realSAC(object):
                 cql_qf1_gap = torch.logsumexp(cql_q1 / self.config.cql_temp, dim=0) * self.config.cql_temp
                 cql_qf2_gap = torch.logsumexp(cql_q2 / self.config.cql_temp, dim=0) * self.config.cql_temp
 
-
             """Q values on the stat-actions with larger dynamics gap - Q values on data"""
-            # TODO: 4.real_q1_pred=Nan
-            # if real_batch_size == 0:
-            #     cql_qf1_diff = torch.clamp(
-            #         - cql_qf1_gap,
-            #         self.config.cql_clip_diff_min,
-            #         self.config.cql_clip_diff_max,
-            #     )
-            #     cql_qf2_diff = torch.clamp(
-            #         - cql_qf2_gap,
-            #         self.config.cql_clip_diff_min,
-            #         self.config.cql_clip_diff_max,
-            #     )
-            # else:
-            #     cql_qf1_diff = torch.clamp(
-            #         - cql_qf1_gap + real_q1_pred.mean(),
-            #         self.config.cql_clip_diff_min,
-            #         self.config.cql_clip_diff_max,
-            #     )
-            #     cql_qf2_diff = torch.clamp(
-            #         - cql_qf2_gap + real_q2_pred.mean(),
-            #         self.config.cql_clip_diff_min,
-            #         self.config.cql_clip_diff_max,
-            #     )
             cql_qf1_diff = torch.clamp(
                 - cql_qf1_gap + real_q1_pred.mean(),
                 self.config.cql_clip_diff_min,
@@ -360,7 +283,6 @@ class Sim2realSAC(object):
                 self.config.cql_clip_diff_min,
                 self.config.cql_clip_diff_max,
             )
-
             # False by default
             if self.config.cql_lagrange:
                 alpha_prime = torch.clamp(torch.exp(self.log_alpha_prime()), min=0.0, max=1000000.0)
@@ -377,8 +299,7 @@ class Sim2realSAC(object):
                 alpha_prime_loss = df_observations.new_tensor(0.0)
                 alpha_prime = df_observations.new_tensor(0.0)
 
-            qf_loss = qf1_loss + qf2_loss + cql_min_qf1_loss + cql_min_qf2_loss + \
-                      real_q_lip + sim_q_lip + q_target_lip
+            qf_loss = qf1_loss + qf2_loss + cql_min_qf1_loss + cql_min_qf2_loss + real_q_lip
 
             if self.config.use_automatic_entropy_tuning:
                 self.alpha_optimizer.zero_grad()
@@ -399,8 +320,6 @@ class Sim2realSAC(object):
                 )
 
             metrics = dict(
-                dsa_train_loss=dsa_loss,
-                dsas_train_loss=dsas_loss,
                 log_pi=df_log_pi.mean().item(),
                 policy_loss=policy_loss.item(),
                 real_qf1_loss=real_qf1_loss.item(),
@@ -422,9 +341,7 @@ class Sim2realSAC(object):
 
             if self.config.use_cql:
                 metrics.update(prefix_metrics(dict(
-                    u_sa=u_sa.mean().item(),
                     std_omega=std_omega.mean().item(),
-                    sqrt_IS_ratio=sqrt_IS_ratio.mean().item(),
                     cql_min_qf1_loss=cql_min_qf1_loss.mean().item(),
                     cql_min_qf2_loss=cql_min_qf2_loss.mean().item(),
                     cql_qf1_diff=cql_qf1_diff.mean().item(),
@@ -451,121 +368,3 @@ class Sim2realSAC(object):
     @property
     def total_steps(self):
         return self._total_steps
-
-    def train_discriminator(self):
-        real_obs, real_action, real_next_obs = self.replay_buffer.sample(self.config.batch_size, scope="real", type="sas").values()
-        sim_obs, sim_action, sim_next_obs = self.replay_buffer.sample(self.config.batch_size, scope="sim", type="sas").values()
-
-        # input noise: prevents overfitting
-        if self.config.noise_std_discriminator > 0:
-            real_obs += torch.randn(real_obs.shape, device=self.config.device) * self.config.noise_std_discriminator
-            real_action += torch.randn(real_action.shape, device=self.config.device) * self.config.noise_std_discriminator
-            real_next_obs += torch.randn(real_next_obs.shape, device=self.config.device) * self.config.noise_std_discriminator
-            sim_obs += torch.randn(sim_obs.shape, device=self.config.device) * self.config.noise_std_discriminator
-            sim_action += torch.randn(sim_action.shape, device=self.config.device) * self.config.noise_std_discriminator
-            sim_next_obs += torch.randn(sim_next_obs.shape, device=self.config.device) * self.config.noise_std_discriminator
-
-        real_sa_logits = self.d_sa(real_obs, real_action)
-        real_sa_prob = F.softmax(real_sa_logits, dim=1)
-        sim_sa_logits = self.d_sa(sim_obs, sim_action)
-        sim_sa_prob = F.softmax(sim_sa_logits, dim=1)
-
-        real_adv_logits = self.d_sas(real_obs, real_action, real_next_obs)
-        real_sas_prob = F.softmax(real_adv_logits + real_sa_logits, dim=1)
-        sim_adv_logits = self.d_sas(sim_obs, sim_action, sim_next_obs)
-        sim_sas_prob = F.softmax(sim_adv_logits + sim_sa_logits, dim=1)
-
-        dsa_loss = (- torch.log(real_sa_prob[:, 0]) - torch.log(sim_sa_prob[:, 1])).mean()
-        dsas_loss = (- torch.log(real_sas_prob[:, 0]) - torch.log(sim_sas_prob[:, 1])).mean()
-
-        # Optimize discriminator(s,a) and discriminator(s,a,s')
-        self.d_sa_optimizer.zero_grad()
-        dsa_loss.backward(retain_graph=True)
-
-        self.d_sas_optimizer.zero_grad()
-        dsas_loss.backward()
-
-        self.d_sa_optimizer.step()
-        self.d_sas_optimizer.step()
-
-        return dsa_loss.cpu().detach().numpy().item(), dsas_loss.cpu().detach().numpy().item()
-
-
-    def discriminator_evaluate(self):
-        s_real, a_real, next_s_real = self.replay_buffer.sample(self.config.batch_size, scope="real", type="sas").values()
-        s_sim, a_sim, next_s_sim = self.replay_buffer.sample(self.config.batch_size, scope="sim", type="sas").values()
-        
-        real_sa_logits = self.d_sa(s_real, a_real)
-        real_sa_prob = F.softmax(real_sa_logits, dim=1)
-        sim_sa_logits = self.d_sa(s_sim, a_sim)
-        sim_sa_prob = F.softmax(sim_sa_logits, dim=1)
-        dsa_loss = ( - torch.log(real_sa_prob[:, 0]) - torch.log(sim_sa_prob[:, 1])).mean()
-
-        real_adv_logits = self.d_sas(s_real, a_real, next_s_real)
-        real_sas_prob = F.softmax(real_adv_logits + real_sa_logits, dim=1)
-        sim_adv_logits = self.d_sas(s_sim, a_sim, next_s_sim)
-        sim_sas_prob = F.softmax(sim_adv_logits + sim_sa_logits, dim=1)
-        dsas_loss = ( - torch.log(real_sas_prob[:, 0]) - torch.log(sim_sas_prob[:, 1])).mean()
-
-        return dsa_loss.cpu().detach().numpy().item(), dsas_loss.cpu().detach().numpy().item()
-
-
-    def kl_sim_divergence(self, observations, actions, next_observations):
-        # expectation on next observation over learned dynamics from the real offline data
-        if self.next_observation_sampler == None:
-            observations = torch.repeat_interleave(observations, self.config.sampling_n_next_states, dim=0)
-            actions = torch.repeat_interleave(actions, self.config.sampling_n_next_states, dim=0)
-            next_observations = torch.repeat_interleave(next_observations, self.config.sampling_n_next_states, dim=0)
-            next_observations += torch.randn(next_observations.shape, device=self.config.device) * self.std * self.config.s_prime_std_ratio
-            log_ratio = self.log_sim_real_dynacmis_ratio(observations, actions, next_observations).reshape((-1, self.config.sampling_n_next_states))
-
-        else:
-            n_next_observations = self.next_observation_sampler.get_next_state(observations, actions, self.config.sampling_n_next_states)
-            sum_log_ratio = self.log_sim_real_dynacmis_ratio(observations, actions, n_next_observations[0])
-            for i in range(1, self.config.sampling_n_next_states):
-                sum_log_ratio += self.log_sim_real_dynacmis_ratio(observations, actions, n_next_observations[i])
-
-        return torch.clamp(log_ratio.mean(dim=1), self.config.sim_q_coeff_min, self.config.sim_q_coeff_max)
-
-
-    def log_sim_real_dynacmis_ratio(self, observations, actions, next_observations):
-        sa_logits = self.d_sa(observations, actions)
-        sa_prob = F.softmax(sa_logits, dim=1)
-        adv_logits = self.d_sas(observations, actions, next_observations)
-        sas_prob = F.softmax(adv_logits + sa_logits, dim=1)
-
-        with torch.no_grad():
-            # clipped pM^/pM
-            log_ratio = - torch.log(sas_prob[:, 0]) \
-                    + torch.log(sas_prob[:, 1]) \
-                    + torch.log(sa_prob[:, 0]) \
-                    - torch.log(sa_prob[:, 1])
-        
-        return log_ratio
-
-    def log_real_sim_dynacmis_ratio(self, observations, actions, next_observations):
-        sa_logits = self.d_sa(observations, actions)
-        sa_prob = F.softmax(sa_logits, dim=1)
-        adv_logits = self.d_sas(observations, actions, next_observations)
-        sas_prob = F.softmax(adv_logits + sa_logits, dim=1)
-
-        with torch.no_grad():
-            # clipped pM/pM^
-            log_ratio = torch.log(sas_prob[:, 0]) \
-                    - torch.log(sas_prob[:, 1]) \
-                    - torch.log(sa_prob[:, 0]) \
-                    + torch.log(sa_prob[:, 1])
-        
-        return log_ratio
-
-    def real_sim_dynacmis_ratio(self, observations, actions, next_observations):
-        sa_logits = self.d_sa(observations, actions)
-        sa_prob = F.softmax(sa_logits, dim=1)
-        adv_logits = self.d_sas(observations, actions, next_observations)
-        sas_prob = F.softmax(adv_logits + sa_logits, dim=1)
-
-        with torch.no_grad():
-            # clipped pM/pM^
-            ratio = (sas_prob[:, 0] * sa_prob[:, 1]) / (sas_prob[:, 1] * sa_prob[:, 0])
-        
-        return ratio
