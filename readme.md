@@ -91,7 +91,7 @@ Also, generated scenarios can be visualized by functions in file `utils/scenario
 If you are using (Re)<sup>2</sup>H2O framework or code for your project development, please cite the following paper:
 
 ```
-@INPROCEEDINGS{10186559,
+@INPROCEEDINGS{niu2023re,
   author={Niu, Haoyi and Ren, Kun and Xu, Yizhou and Yang, Ziyuan and Lin, Yichen and Zhang, Yi and Hu, Jianming},
   booktitle={2023 IEEE Intelligent Vehicles Symposium (IV)}, 
   title={(Re)2H2O: Autonomous Driving Scenario Generation via Reversely Regularized Hybrid Offline-and-Online Reinforcement Learning}, 
