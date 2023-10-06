@@ -21,24 +21,45 @@ from H2O.SimpleSAC.utils_h2o import (Timer, WandBLogger, define_flags_with_defau
 
 from H2O.Network.Weight_net import ConcatDiscriminator
 from H2O.viskit.logging import logger, setup_logger
+import time
 import argparse
+
 import torch
+
+
+waiting_time = [0, 0, 0]
+while waiting_time[0] >= 0:
+    while waiting_time[1] >= 0:
+        while waiting_time[2] >= 0:
+            time.sleep(1)
+            print("Run after ",
+                  waiting_time[0], "hours",
+                  waiting_time[1], "minutes",
+                  waiting_time[2], "seconds",
+                  end='\r')
+            waiting_time[2] -= 1
+        waiting_time[1] -= 1
+        waiting_time[2] = 60
+    waiting_time[0] -= 1
+    waiting_time[1] = 60
+
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--USED_wandb', type=str, default="True")
-parser.add_argument('--ego_policy', type=str, default="RL")  # "uniform", "sumo", "fvdm", "realdata", "genedata", "RL"
-parser.add_argument('--adv_policy', type=str, default="fvdm")  # "uniform", "sumo", "fvdm", "realdata", "genedata", "RL"
-parser.add_argument('--n_epochs_ego', type=str, default="500")
-parser.add_argument('--n_epochs_adv', type=str, default="0")
-parser.add_argument('--num_agents', type=int, default=5)
+parser.add_argument('--ego_policy', type=str, default="-sumo")  # "uniform", "sumo", "fvdm", "realdata", "genedata", "RL"
+parser.add_argument('--adv_policy', type=str, default="-RL")  # "uniform", "sumo", "fvdm", "realdata", "genedata", "RL"
+parser.add_argument('--n_epochs_ego', type=str, default="0")
+parser.add_argument('--n_epochs_adv', type=str, default="1000")
+parser.add_argument('--num_agents', type=int, default=4)
 parser.add_argument('--r_ego', type=str, default="r1")
 parser.add_argument('--r_adv', type=str, default="r3")
-parser.add_argument('--realdata_path', type=str, default="E:/Scenario_Generation/dataset/Re_2_H2O/r3_dis_25_car_6/")  #
+parser.add_argument('--realdata_path', type=str, default="dataset/Re_2_H2O/r3_dis_25_car_5/")  #
+# parser.add_argument('--realdata_path', type=str, default="../byH2O/dataset/r1_dis_10_car_2/")  #
 parser.add_argument('--batch_ratio', type=float, default=0.5)
-parser.add_argument('--is_save', type=str, default="True")
+parser.add_argument('--is_save', type=str, default="False")
 parser.add_argument('--device', type=str, default="cuda:0")
-parser.add_argument('--seed', type=int, default=42)
+parser.add_argument('--seed', type=int, default=100)
 parser.add_argument('--save_model', type=str, default="False")
 parser.add_argument('--cql_min_q_weight', type=float, default=0.1)
 
@@ -137,15 +158,6 @@ def main(argv):
             os.mkdir(eval_savepath)
         if os.path.exists(path_save_model) is False:
             os.mkdir(path_save_model)
-        # path_save_model = "models/" + tag + \
-        #                   f"simdata-ratio={FLAGS.batch_ratio}_av={FLAGS.ego_policy}_" \
-        #                   f"bv={FLAGS.num_agents}-{FLAGS.adv_policy}_" \
-        #                   f"r-ego={FLAGS.r_ego}_r-adv={FLAGS.r_adv}_" \
-        #                   f"seed={FLAGS.seed}_time={FLAGS.current_time}" + "/"
-        # if os.path.exists("models") is False:
-        #     os.mkdir("models")
-        # if os.path.exists(path_save_model) is False:
-        #     os.mkdir(path_save_model)
     if FLAGS.USED_wandb:
         variant = get_user_flags(FLAGS, FLAGS_DEF)
         wandb_logger = WandBLogger(config=FLAGS.logging, variant=variant)
@@ -253,7 +265,7 @@ def main(argv):
             num_action_adv,
             arch=FLAGS.qf_arch,
             orthogonal_init=FLAGS.orthogonal_init,
-            is_LN=3 if FLAGS.num_agents >= 5 else 0,
+            is_LN=True
         )
         target_qf1_adv = deepcopy(qf1_adv)
 
@@ -262,7 +274,7 @@ def main(argv):
             num_action_adv,
             arch=FLAGS.qf_arch,
             orthogonal_init=FLAGS.orthogonal_init,
-            is_LN=3 if FLAGS.num_agents >= 5 else 0,
+            is_LN=True
         )
         target_qf2_adv = deepcopy(qf2_adv)
 
@@ -271,7 +283,8 @@ def main(argv):
 
         sac_adv = Sim2realSAC(FLAGS.cql_adv, adv_policy, qf1_adv, qf2_adv, target_qf1_adv, target_qf2_adv, d_sa, d_sas,
                               replay_buffer_adv, dynamics_model=None, device=FLAGS.device,
-                              is_real_q_lip=(FLAGS.num_agents >= 5))
+                              is_real_q_lip=True
+                              )
         sac_adv.torch_to_device(FLAGS.device)
 
         # sampling policy is always the current policy: \pi
@@ -291,9 +304,7 @@ def main(argv):
     n_loops = max(len(n_epochs_adv), len(n_epochs_ego))
     for l in range(n_loops):
         if l < len(n_epochs_ego):
-            # 设置储存路径
             eval_sampler.rootsavepath = eval_savepath_train_ego
-            # 设置AV和BV策略
             ego_policy_curr = ego_policy_list.pop()
             adv_policy_curr = adv_policy_list.pop()
             train_sampler.env.ego_policy = ego_policy_curr
@@ -384,12 +395,12 @@ def main(argv):
                         for batch_idx in trange(FLAGS.n_train_step_per_epoch):
                             real_batch_size = int(FLAGS.batch_size * (1 - FLAGS.batch_ratio))
                             sim_batch_size = int(FLAGS.batch_size * FLAGS.batch_ratio)
-                            # if batch_idx + 1 == FLAGS.n_train_step_per_epoch:
-                            #     metrics.update(
-                            #         prefix_metrics(sac_adv.train(real_batch_size, sim_batch_size), 'sac_adv')
-                            #     )
-                            # else:
-                            sac_adv.train(real_batch_size, sim_batch_size)
+                            if batch_idx + 1 == FLAGS.n_train_step_per_epoch:
+                                metrics.update(
+                                    prefix_metrics(sac_adv.train(real_batch_size, sim_batch_size), 'sac_adv')
+                                )
+                            else:
+                                sac_adv.train(real_batch_size, sim_batch_size)
 
                 with Timer() as eval_timer:
                     if epoch == 0 or (epoch + 1) % FLAGS.eval_period == 0:
@@ -412,18 +423,6 @@ def main(argv):
                         metrics['CPS'] = (metrics['metrics_av_crash'] * len(trajs)) / np.sum([t["traj_time"] for t in trajs])
                         metrics['CPM'] = (metrics['metrics_av_crash'] * len(trajs)) / np.sum([t["traj_dis"] for t in trajs])
 
-                        # metrics['dis_av_crash'] = np.mean([t["dis_av_crash"] for t in trajs])
-                        # metrics['dis_bv_crash'] = np.mean([t["dis_bv_crash"] for t in trajs])
-                        # metrics['ego_col_cost'] = np.mean([np.mean(t['ego_col_cost']) for t in trajs])
-                        # metrics['adv_col_cost'] = np.mean([np.mean(t['adv_col_cost']) for t in trajs])
-                        # metrics['adv_road_cost'] = np.mean([np.mean(t['adv_road_cost']) for t in trajs])
-                        # metrics['rewards_ego_col'] = np.mean([np.mean(t['rewards_ego_col']) for t in trajs])
-                        # metrics['rewards_ego_speed'] = np.mean([np.mean(t['rewards_ego_speed']) for t in trajs])
-                        # if FLAGS.save_model and FLAGS.USED_wandb:
-                        #     save_data = {'sac_adv': sac_adv, 'sac_ego': sac_ego,
-                        #                  'variant': variant, 'epoch': epoch}
-                        #     wandb_logger.save_pickle(save_data, 'model.pkl')
-
                 metrics['rollout_time'] = rollout_timer()
                 metrics['train_time'] = train_timer()
                 metrics['eval_time'] = eval_timer()
@@ -435,12 +434,6 @@ def main(argv):
                 logger.dump_tabular(with_prefix=False, with_timestamp=False)
             if n_epochs_adv[l] != 0 and FLAGS.save_model:
                 torch.save(adv_policy, path_save_model + "model_bv_loop" + str(l) + ".pkl")
-                # torch.save(sac_adv, path_save_model + "model_bv_loop" + str(l) + ".pkl")
-
-    # if FLAGS.save_model and FLAGS.USED_wandb:
-    #     save_data = {'sac_adv': sac_adv, 'sac_ego': sac_ego,
-    #                  'variant': variant, 'epoch': epoch}
-    #     wandb_logger.save_pickle(save_data, 'model.pkl')
 
 
 if __name__ == '__main__':

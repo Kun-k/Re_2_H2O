@@ -44,7 +44,7 @@ def multiple_action_q_function(forward):
 
 
 class FullyConnectedNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, arch='256-256', orthogonal_init=False, is_LN=0):
+    def __init__(self, input_dim, output_dim, arch='256-256', orthogonal_init=False, is_LN=False, is_SN=False):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -60,12 +60,13 @@ class FullyConnectedNetwork(nn.Module):
             if orthogonal_init:
                 nn.init.orthogonal_(fc.weight, gain=np.sqrt(2))
                 nn.init.constant_(fc.bias, 0.0)
+            if is_SN:
+                modules.append(spectral_norm(fc))
             else:
                 modules.append(fc)
-
             modules.append(nn.ReLU())
 
-            if is_LN == 3:
+            if is_LN:
                 ln = nn.LayerNorm(hidden_size)
                 modules.append(ln)
 
@@ -78,18 +79,15 @@ class FullyConnectedNetwork(nn.Module):
             nn.init.xavier_uniform_(last_fc.weight, gain=1e-2)
         nn.init.constant_(last_fc.bias, 0.0)
 
-        # if is_SN:
-        #     modules.append(spectral_norm(last_fc))
-        # else:
-        modules.append(last_fc)
+        if is_SN:
+            modules.append(spectral_norm(last_fc))
+        else:
+            modules.append(last_fc)
 
         self.network = nn.Sequential(*modules)
 
     def forward(self, input_tensor):
-        for layer in self.network:
-            input_tensor = layer(input_tensor)
-        return input_tensor
-        # return self.network(input_tensor)
+        return self.network(input_tensor)
 
 
 class ReparameterizedTanhGaussian(nn.Module):
@@ -147,7 +145,7 @@ class TanhGaussianPolicy(nn.Module):
         self.no_tanh = no_tanh
 
         self.base_network = FullyConnectedNetwork(
-            observation_dim, 2 * action_dim, arch, orthogonal_init, is_LN=0
+            observation_dim, 2 * action_dim, arch, orthogonal_init, is_LN=False, is_SN=False
         )
         self.log_std_multiplier = Scalar(log_std_multiplier)
         self.log_std_offset = Scalar(log_std_offset)
@@ -190,14 +188,14 @@ class SamplerPolicy(object):
 
 
 class FullyConnectedQFunction(nn.Module):
-    def __init__(self, observation_dim, action_dim, arch='256-256', orthogonal_init=False, is_LN=0, is_SN=False):
+    def __init__(self, observation_dim, action_dim, arch='256-256', orthogonal_init=False, is_LN=False, is_SN=False):
         super().__init__()
         self.observation_dim = observation_dim
         self.action_dim = action_dim
         self.arch = arch
         self.orthogonal_init = orthogonal_init
         self.network = FullyConnectedNetwork(
-            observation_dim + action_dim, 1, arch, orthogonal_init, is_LN=is_LN
+            observation_dim + action_dim, 1, arch, orthogonal_init, is_LN=is_LN, is_SN=is_SN
         )
 
     @multiple_action_q_function
