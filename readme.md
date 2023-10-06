@@ -2,7 +2,7 @@
 
 (Re)$^2$H2O ([https://arxiv.org/abs/2302.13726](https://arxiv.org/abs/2302.13726)) is a approach that combines offline real-world data and online simulation data to generate diverse and challenging scenarios for testing autonomous vehicles (AVs). Via  a **Re**versely **Re**gularized **H**ybrid **O**ffline-and-**O**nline Reinforcement Learning framework,  (Re)$^2$H2O penalizes Q-values on real-world data and rewards Q-values on simulated data to ensure the generated scenarios are both varied and adversarial. Extensive experiments have shown that this (Re)$^2$H2O is capable of generating riskier scenarios compared to competitive baselines and can generalize its applicability to various autonomous driving models. Additionally, these generated scenarios are proven to be effective for fine-tuning the performance of AVs.
 
-![image-20231005233259313](C:\Users\kun_s\AppData\Roaming\Typora\typora-user-images\image-20231005233259313.png)
+![image-20231006154907283](Re_2_H2O.png)
 
 ## 1. Installation and Setups
 
