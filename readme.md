@@ -1,6 +1,6 @@
-# (Re)$^2$H2O
+# (Re)<sup>2</sup>H2O
 
-(Re)$^2$H2O ([https://arxiv.org/abs/2302.13726](https://arxiv.org/abs/2302.13726)) is a approach that combines offline real-world data and online simulation data to generate diverse and challenging scenarios for testing autonomous vehicles (AVs). Via  a **Re**versely **Re**gularized **H**ybrid **O**ffline-and-**O**nline Reinforcement Learning framework,  (Re)$^2$H2O penalizes Q-values on real-world data and rewards Q-values on simulated data to ensure the generated scenarios are both varied and adversarial. Extensive experiments have shown that this (Re)$^2$H2O is capable of generating riskier scenarios compared to competitive baselines and can generalize its applicability to various autonomous driving models. Additionally, these generated scenarios are proven to be effective for fine-tuning the performance of AVs.
+(Re)<sup>2</sup>H2O ([https://arxiv.org/abs/2302.13726](https://arxiv.org/abs/2302.13726)) is a approach that combines offline real-world data and online simulation data to generate diverse and challenging scenarios for testing autonomous vehicles (AVs). Via  a **Re**versely **Re**gularized **H**ybrid **O**ffline-and-**O**nline Reinforcement Learning framework,  (Re)<sup>2</sup>H2O penalizes Q-values on real-world data and rewards Q-values on simulated data to ensure the generated scenarios are both varied and adversarial. Extensive experiments have shown that this (Re)<sup>2</sup>H2O is capable of generating riskier scenarios compared to competitive baselines and can generalize its applicability to various autonomous driving models. Additionally, these generated scenarios are proven to be effective for fine-tuning the performance of AVs.
 
 ![image-20231006154907283](Re_2_H2O.png)
 
@@ -44,7 +44,7 @@ Traffic dataset needs to be downloaded from the [highD dataset](https://levelxda
 
 ### Adversarial Training:
 
-To train the adv-agents via (Re)$^2$H2O, run:
+To train the adv-agents via (Re)<sup>2</sup>H2O, run:
 
 ```python
 python main.py --ego_policy="-sumo" --adv_policy="-RL" --n_epochs_ego=0 --n_epochs_ego=1000 --num_agents=2 --realdata_path="../dataset/r3_dis_20_car_3/" --is_save=False
@@ -88,11 +88,11 @@ Also, generated scenarios can be visualized by functions in file `utils/scenario
 
 ## 5. Citation
 
-If you are using (Re)$^2$H2O framework or code for your project development, please cite the following paper:
+If you are using (Re)<sup>2</sup>H2O framework or code for your project development, please cite the following paper:
 
 ```
 @misc{niu2023re2h2o,
-      title={(Re)$^2$H2O: Autonomous Driving Scenario Generation via Reversely Regularized Hybrid Offline-and-Online Reinforcement Learning}, 
+      title={(Re)<sup>2</sup>H2O: Autonomous Driving Scenario Generation via Reversely Regularized Hybrid Offline-and-Online Reinforcement Learning}, 
       author={Haoyi Niu and Kun Ren and Yizhou Xu and Ziyuan Yang and Yichen Lin and Yi Zhang and Jianming Hu},
       year={2023},
       eprint={2302.13726},
