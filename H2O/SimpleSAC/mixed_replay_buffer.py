@@ -9,7 +9,7 @@ from .replay_buffer import ReplayBuffer
 class MixedReplayBuffer(ReplayBuffer):
     def __init__(self, reward_scale, reward_bias, clip_action, state_dim, action_dim, realdata_path,
                  device="cuda", scale_rewards=True, scale_state=False, buffer_ratio=1,
-                 residual_ratio=0.1, r_adv=None):
+                 residual_ratio=0.1):
         super().__init__(state_dim, action_dim, device=device)
 
         self.scale_rewards = scale_rewards
@@ -42,88 +42,6 @@ class MixedReplayBuffer(ReplayBuffer):
             for key in key_list:
                 dataset[key].extend(newdataset[key])
         # dataset = np.load("dataset/data00/02/02_2_10_908.npy", allow_pickle='TRUE').item()
-
-        if r_adv is not None and r_adv[0:2] == "r2":
-            dataset['rewards'] = []
-            length = 5
-            width = 1.8
-            for t in range(len(dataset['observations'])):
-                ego_state = dataset['next_observations'][t][0:4]
-                adv_state = dataset['next_observations'][t][4:]
-                num_adv_agents = int(action_dim / 2)
-                # r1
-                # if r_adv == "r1":
-                #     reward = 0
-                #     dataset['rewards'].append(reward)
-                # r2
-                if r_adv[0:2] == "r2":
-                    ego_col_cost_record, adv_col_cost_record, adv_road_cost_record = float('inf'), float('inf'), float(
-                        'inf')
-                    bv_bv_thresh = 1.5
-                    bv_road_thresh = float("inf")
-                    a, b, c = list(map(float, r_adv[3:].split('-')))
-
-                    for i in range(num_adv_agents):
-                        car_ego = [ego_state[0], ego_state[1],
-                                   length, width, ego_state[3]]
-                        car_adv = [adv_state[i * 4 + 0], adv_state[i * 4 + 1],
-                                   length, width, adv_state[i * 4 + 3]]
-                        dis_ego_adv = dist_between_cars(car_ego, car_adv)
-                        # dis_ego_adv = math.sqrt((ego_state[0] - adv_state[i * 4 + 0]) ** 2 +
-                        #                         (ego_state[1] - adv_state[i * 4 + 1]) ** 2)
-                        if dis_ego_adv < ego_col_cost_record:
-                            ego_col_cost_record = dis_ego_adv
-                    ego_col_cost = ego_col_cost_record
-
-                    for i in range(num_adv_agents):
-                        for j in range(i + 1, num_adv_agents):
-                            car_adv_j = [adv_state[j * 4 + 0], adv_state[j * 4 + 1],
-                                         length, width, adv_state[j * 4 + 3]]
-                            car_adv_i = [adv_state[i * 4 + 0], adv_state[i * 4 + 1],
-                                         length, width, adv_state[i * 4 + 3]]
-                            dis_adv_adv = dist_between_cars(car_adv_i, car_adv_j)
-
-                            # dis_adv_adv = np.sqrt((adv_state[i * 4 + 0] - adv_state[j * 4 + 0]) ** 2 +
-                            #                       (adv_state[i * 4 + 1] - adv_state[j * 4 + 1]) ** 2)
-                            if dis_adv_adv < adv_col_cost_record:
-                                adv_col_cost_record = dis_adv_adv
-                    adv_col_cost = min(adv_col_cost_record, bv_bv_thresh)
-
-                    road_up, road_low = 12, 0
-                    car_width = 1.8
-                    for i in range(num_adv_agents):
-                        y = adv_state[i * 4 + 1]
-                        dis_adv_road = min(road_up - (y + car_width / 2), (y - car_width / 2) - road_low)
-                        if dis_adv_road < adv_road_cost_record:
-                            adv_road_cost_record = dis_adv_road
-                    adv_road_cost = min(adv_road_cost_record, bv_road_thresh)
-                    reward = - a * ego_col_cost + b * adv_col_cost + c * adv_road_cost
-                    # reward = -ego_col_cost + adv_col_cost + adv_road_cost
-                    dataset['rewards'].append(reward)
-                    if ego_col_cost > 15:
-                        dataset['observations'] = dataset['observations'][0: t + 1]
-                        dataset['terminals'] = dataset['terminals'][0: t + 1]
-                        break
-                # r3
-                # elif r_adv == "r3":
-                #     ego_col_cost_record = float('inf')
-                #     for i in range(num_adv_agents):
-                #         car_ego = [ego_state[0], ego_state[1],
-                #                    length, width, ego_state[3]]
-                #         car_adv = [adv_state[i * 4 + 0], adv_state[i * 4 + 1],
-                #                    length, width, adv_state[i * 4 + 3]]
-                #         dis_ego_adv = dist_between_cars(car_ego, car_adv)
-                #         # dis_ego_adv = math.sqrt((ego_state[0] - adv_state[i * 4 + 0]) ** 2 +
-                #         #                         (ego_state[1] - adv_state[i * 4 + 1]) ** 2)
-                #         if dis_ego_adv < ego_col_cost_record:
-                #             ego_col_cost_record = dis_ego_adv
-                #     ego_col_cost = ego_col_cost_record
-                #     reward = -ego_col_cost
-                #     dataset['rewards'].append(reward)
-                #     if ego_col_cost > 15:
-                #         dataset['observations'] = dataset['observations'][0: t + 1]
-                #         dataset['terminals'] = dataset['terminals'][0: t + 1]
-                #         break
 
         # load expert dataset into the replay buffer
         # total_num = dataset['observations'].shape[0]
