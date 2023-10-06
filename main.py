@@ -21,28 +21,8 @@ from H2O.SimpleSAC.utils_h2o import (Timer, WandBLogger, define_flags_with_defau
 
 from H2O.Network.Weight_net import ConcatDiscriminator
 from H2O.viskit.logging import logger, setup_logger
-import time
 import argparse
-
 import torch
-
-
-waiting_time = [0, 0, 0]
-while waiting_time[0] >= 0:
-    while waiting_time[1] >= 0:
-        while waiting_time[2] >= 0:
-            time.sleep(1)
-            print("Run after ",
-                  waiting_time[0], "hours",
-                  waiting_time[1], "minutes",
-                  waiting_time[2], "seconds",
-                  end='\r')
-            waiting_time[2] -= 1
-        waiting_time[1] -= 1
-        waiting_time[2] = 60
-    waiting_time[0] -= 1
-    waiting_time[1] = 60
-
 
 
 parser = argparse.ArgumentParser()
@@ -55,7 +35,6 @@ parser.add_argument('--num_agents', type=int, default=5)
 parser.add_argument('--r_ego', type=str, default="r1")
 parser.add_argument('--r_adv', type=str, default="r3")
 parser.add_argument('--realdata_path', type=str, default="E:/Scenario_Generation/dataset/Re_2_H2O/r3_dis_25_car_6/")  #
-# parser.add_argument('--realdata_path', type=str, default="../byH2O/dataset/r1_dis_10_car_2/")  #
 parser.add_argument('--batch_ratio', type=float, default=0.5)
 parser.add_argument('--is_save', type=str, default="True")
 parser.add_argument('--device', type=str, default="cuda:0")
