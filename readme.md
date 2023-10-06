@@ -92,7 +92,7 @@ If you are using (Re)<sup>2</sup>H2O framework or code for your project developm
 
 ```
 @misc{niu2023re2h2o,
-      title={(Re)<sup>2</sup>H2O: Autonomous Driving Scenario Generation via Reversely Regularized Hybrid Offline-and-Online Reinforcement Learning}, 
+      title={(Re)$^2$H2O: Autonomous Driving Scenario Generation via Reversely Regularized Hybrid Offline-and-Online Reinforcement Learning}, 
       author={Haoyi Niu and Kun Ren and Yizhou Xu and Ziyuan Yang and Yichen Lin and Yi Zhang and Jianming Hu},
       year={2023},
       eprint={2302.13726},
