@@ -169,7 +169,7 @@ class TrajSampler(object):
                                              datetime.now().strftime("%Y-%m-%d--%H-%M-%S-%f") + '.csv')
 
             traj_time = len(observations)
-            traj_dis = observations[-1][0]
+            traj_dis = observations[-1][0] - observations[0][0]  # AV的前进距离
             collision_time = 0 if info[0] != "AV crashed!" else traj_time
             collision_dis = 0 if info[0] != "AV crashed!" else traj_dis
 
